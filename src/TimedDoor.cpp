@@ -1,7 +1,7 @@
 // Copyright 2021 GHA Test Team
+
 #include "TimedDoor.h"
 #include <iostream>
-#include <thread>
 #include <chrono>
 #include <stdexcept>
 
@@ -11,46 +11,50 @@ void DoorTimerAdapter::Timeout() {
     door.checkTimeout();
 }
 
-TimedDoor::TimedDoor(int timeout) : iTimeout(timeout), isOpened(false) {
+TimedDoor::TimedDoor(int timeout)
+    : iTimeout(timeout), isOpened(false), isTimerActive(false) {
     adapter = new DoorTimerAdapter(*this);
 }
 
 TimedDoor::~TimedDoor() {
-    if (th && th->joinable()) {
-        th->join();
-        delete th;
-    }
+    lock();
     delete adapter;
 }
 
 bool TimedDoor::isDoorOpened() {
-    return isOpened;
+    return isOpened.load();
 }
 
 void TimedDoor::unlock() {
-    isOpened = true;
-    if (th && th->joinable()) {
-        th->join();
-        delete th;
+    if (isOpened.exchange(true)) {
+        return;
     }
-    th = new std::thread([this]() {
+
+    if (timerThread && timerThread->joinable()) {
+        isTimerActive = false;
+        timerThread->join();
+    }
+
+    isTimerActive = true;
+    timerThread = std::make_unique<std::thread>([this]() {
         std::this_thread::sleep_for(std::chrono::seconds(iTimeout));
-        if (isOpened) {
+        if (isTimerActive.load() && isOpened.load()) {
             adapter->Timeout();
         }
         });
 }
 
 void TimedDoor::lock() {
-    if (isOpened) {
+    isTimerActive = false;
+    if (timerThread && timerThread->joinable()) {
+        timerThread->join();
+    }
+
+    if (isOpened.load()) {
         checkTimeout();
     }
+
     isOpened = false;
-    if (th && th->joinable()) {
-        th->join();
-        delete th;
-        th = nullptr;
-    }
 }
 
 int TimedDoor::getTimeOut() const {
@@ -58,14 +62,18 @@ int TimedDoor::getTimeOut() const {
 }
 
 void TimedDoor::throwState() {
-    if (isOpened) {
+    checkTimeout();
+}
+
+void TimedDoor::checkTimeout() {
+    if (isOpened.load()) {
         throw std::runtime_error("Door is still opened after timeout!");
     }
 }
 
-void TimedDoor::checkTimeout() {
-    if (isOpened) {
-        throw std::runtime_error("Door is still opened after timeout!");
+Timer::~Timer() {
+    if (timerThread && timerThread->joinable()) {
+        timerThread->join();
     }
 }
 
@@ -74,11 +82,14 @@ void Timer::sleep(int seconds) {
 }
 
 void Timer::tregister(int timeout, TimerClient* client) {
-    this->client = client;
-    std::thread([this, timeout]() {
+    if (timerThread && timerThread->joinable()) {
+        timerThread->join();
+    }
+
+    timerThread = std::make_unique<std::thread>([this, timeout, client]() {
         sleep(timeout);
-        if (this->client) {
-            this->client->Timeout();
+        if (client) {
+            client->Timeout();
         }
-        }).detach();
+        });
 }

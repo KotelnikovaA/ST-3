@@ -1,8 +1,11 @@
 // Copyright 2021 GHA Test Team
+
 #ifndef INCLUDE_TIMEDDOOR_H_
 #define INCLUDE_TIMEDDOOR_H_
 
 #include <thread>
+#include <atomic>
+#include <memory>
 
 class DoorTimerAdapter;
 class Timer;
@@ -12,6 +15,7 @@ class TimedDoor;
 class TimerClient {
  public:
     virtual void Timeout() = 0;
+    virtual ~TimerClient() = default;
 };
 
 class Door {
@@ -27,7 +31,7 @@ class DoorTimerAdapter : public TimerClient {
     TimedDoor& door;
 
  public:
-    explicit DoorTimerAdapter(TimedDoor&);
+    explicit DoorTimerAdapter(TimedDoor& d);
     void Timeout() override;
 };
 
@@ -37,26 +41,31 @@ class TimedDoor : public Door {
  private:
     DoorTimerAdapter* adapter;
     int iTimeout;
-    bool isOpened;
-    std::thread* th;
+    std::atomic<bool> isOpened;
+    std::atomic<bool> isTimerActive;
+    std::unique_ptr<std::thread> timerThread;
 
  public:
-    explicit TimedDoor(int);
+    explicit TimedDoor(int timeout);
     ~TimedDoor() override;
+
     bool isDoorOpened() override;
     void unlock() override;
     void lock() override;
     int getTimeOut() const;
     void throwState();
     void checkTimeout();
+    TimedDoor(const TimedDoor&) = delete;
+    TimedDoor& operator=(const TimedDoor&) = delete;
 };
 
 class Timer {
-    TimerClient* client = nullptr;
-    void sleep(int);
+    std::unique_ptr<std::thread> timerThread;
 
  public:
-    void tregister(int, TimerClient*);
+    ~Timer();
+    void tregister(int timeout, TimerClient* client);
+    void sleep(int seconds);
 };
 
 #endif  // INCLUDE_TIMEDDOOR_H_
