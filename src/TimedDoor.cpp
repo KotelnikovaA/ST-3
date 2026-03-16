@@ -1,95 +1,69 @@
 // Copyright 2021 GHA Test Team
 
 #include "TimedDoor.h"
-#include <iostream>
 #include <chrono>
 #include <stdexcept>
+#include <thread>
 
 DoorTimerAdapter::DoorTimerAdapter(TimedDoor& d) : door(d) {}
 
 void DoorTimerAdapter::Timeout() {
-    door.checkTimeout();
+    if (door.isDoorOpened()) {
+        door.isThrow = true;
+    }
 }
 
-TimedDoor::TimedDoor(int timeout)
-    : iTimeout(timeout), isOpened(false), isTimerActive(false) {
-    adapter = new DoorTimerAdapter(*this);
-}
-
-TimedDoor::~TimedDoor() {
-    lock();
-    delete adapter;
+TimedDoor::TimedDoor(int timeoutValue) :
+    iTimeout(timeoutValue),
+    isOpened(false),
+    adapter(new DoorTimerAdapter(*this)) {
 }
 
 bool TimedDoor::isDoorOpened() {
-    return isOpened.load();
+    return isOpened;
 }
 
 void TimedDoor::unlock() {
-    if (isOpened.exchange(true)) {
-        return;
-    }
+    isOpened = true;
 
-    if (timerThread && timerThread->joinable()) {
-        isTimerActive = false;
-        timerThread->join();
-    }
-
-    isTimerActive = true;
-    timerThread = std::make_unique<std::thread>([this]() {
-        std::this_thread::sleep_for(std::chrono::seconds(iTimeout));
-        if (isTimerActive.load() && isOpened.load()) {
-            adapter->Timeout();
-        }
+    th = new std::thread([&]() {
+        Timer timer;
+        timer.tregister(iTimeout, adapter);
         });
 }
 
 void TimedDoor::lock() {
-    isTimerActive = false;
-    if (timerThread && timerThread->joinable()) {
-        timerThread->join();
-    }
-
-    if (isOpened.load()) {
-        checkTimeout();
-    }
-
+    throwState();
     isOpened = false;
+
+    if (th) {
+        th->join();
+        delete th;
+    }
+    th = nullptr;
 }
 
 int TimedDoor::getTimeOut() const {
     return iTimeout;
 }
-
 void TimedDoor::throwState() {
-    checkTimeout();
-}
-
-void TimedDoor::checkTimeout() {
-    if (isOpened.load()) {
-        throw std::runtime_error("Door is still opened after timeout!");
+    if (isThrow) {
+        throw std::runtime_error("Door is opened for a long time!");
     }
 }
-
-Timer::~Timer() {
-    if (timerThread && timerThread->joinable()) {
-        timerThread->join();
-    }
-}
-
-void Timer::sleep(int seconds) {
-    std::this_thread::sleep_for(std::chrono::seconds(seconds));
-}
-
-void Timer::tregister(int timeout, TimerClient* client) {
-    if (timerThread && timerThread->joinable()) {
-        timerThread->join();
+void Timer::sleep(int timeoutValue) {
+    if (timeoutValue <= 0) {
+        throw std::invalid_argument("Value needs to be positive!");
     }
 
-    timerThread = std::make_unique<std::thread>([this, timeout, client]() {
-        sleep(timeout);
-        if (client) {
-            client->Timeout();
-        }
-        });
+    std::this_thread::sleep_for(std::chrono::seconds(timeoutValue));
+}
+void Timer::tregister(int timeoutValue, TimerClient* c) {
+    if (timeoutValue <= 0) {
+        throw std::invalid_argument("Value needs to be positive!");
+    }
+
+    this->client = c;
+    sleep(timeoutValue);
+    this->client->Timeout();
 }

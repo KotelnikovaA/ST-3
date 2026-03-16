@@ -4,8 +4,6 @@
 #define INCLUDE_TIMEDDOOR_H_
 
 #include <thread>
-#include <atomic>
-#include <memory>
 
 class DoorTimerAdapter;
 class Timer;
@@ -13,59 +11,50 @@ class Door;
 class TimedDoor;
 
 class TimerClient {
- public:
+public:
     virtual void Timeout() = 0;
-    virtual ~TimerClient() = default;
 };
 
 class Door {
- public:
+public:
     virtual void lock() = 0;
     virtual void unlock() = 0;
     virtual bool isDoorOpened() = 0;
-    virtual ~Door() = default;
 };
 
 class DoorTimerAdapter : public TimerClient {
- private:
+private:
     TimedDoor& door;
 
- public:
-    explicit DoorTimerAdapter(TimedDoor& d);
-    void Timeout() override;
+public:
+    explicit DoorTimerAdapter(TimedDoor&);
+    void Timeout();
 };
 
 class TimedDoor : public Door {
     friend class DoorTimerAdapter;
 
- private:
+private:
     DoorTimerAdapter* adapter;
     int iTimeout;
-    std::atomic<bool> isOpened;
-    std::atomic<bool> isTimerActive;
-    std::unique_ptr<std::thread> timerThread;
+    bool isOpened, isThrow = false;
+    std::thread* th = nullptr;
 
- public:
-    explicit TimedDoor(int timeout);
-    ~TimedDoor() override;
-
-    bool isDoorOpened() override;
-    void unlock() override;
-    void lock() override;
-    int getTimeOut() const;
+public:
+    explicit TimedDoor(int);
+    bool isDoorOpened();
+    void unlock();
+    void lock();
+    int  getTimeOut() const;
     void throwState();
-    void checkTimeout();
-    TimedDoor(const TimedDoor&) = delete;
-    TimedDoor& operator=(const TimedDoor&) = delete;
 };
 
 class Timer {
-    std::unique_ptr<std::thread> timerThread;
+    TimerClient* client;
+    void sleep(int);
 
- public:
-    ~Timer();
-    void tregister(int timeout, TimerClient* client);
-    void sleep(int seconds);
+public:
+    void tregister(int, TimerClient*);
 };
 
 #endif  // INCLUDE_TIMEDDOOR_H_
