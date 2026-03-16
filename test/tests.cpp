@@ -27,7 +27,7 @@ public:
 
 class MockTimedDoor : public TimedDoor {
 public:
-    MockTimedDoor(int timeout) : TimedDoor(timeout) {}
+    explicit MockTimedDoor(int timeout) : TimedDoor(timeout) {}
     MOCK_METHOD(bool, isDoorOpened, (), (override));
     MOCK_METHOD(void, throwState, (), (override));
 };
@@ -173,7 +173,7 @@ TEST_F(TimedDoorTest, ThrowStateDoesntChangeDoorState) {
         adapter->Timeout();
     }
     catch (...) {
-
+        // Исключение ожидаемо, игнорируем его
     }
 
     EXPECT_TRUE(door->isDoorOpened());
