@@ -168,13 +168,6 @@ TEST(TimerTest, NullClient) {
 TEST_F(TimedDoorTest, ThrowStateDoesntChangeDoorState) {
     door->unlock();
     EXPECT_TRUE(door->isDoorOpened());
-
-    try {
-        adapter->Timeout();
-    }
-    catch (...) {
-        
-    }
-
+    adapter->Timeout();
     EXPECT_TRUE(door->isDoorOpened());
 }
