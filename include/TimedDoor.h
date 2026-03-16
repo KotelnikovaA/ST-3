@@ -35,11 +35,11 @@ class TimedDoor : public Door {
   bool isOpened;
  public:
   explicit TimedDoor(int);
-  bool isDoorOpened();
-  void unlock();
-  void lock();
-  int  getTimeOut() const;
-  void throwState();
+  virtual bool isDoorOpened() override;
+  virtual void unlock() override;
+  virtual void lock() override;
+  int getTimeOut();
+  virtual void throwState();
 };
 
 class Timer {
