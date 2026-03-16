@@ -14,26 +14,26 @@ using ::testing::AtLeast;
 using ::testing::NiceMock;
 
 class MockTimerClient : public TimerClient {
-public:
+ public:
     MOCK_METHOD(void, Timeout, (), (override));
 };
 
 class MockDoor : public Door {
-public:
+ public:
     MOCK_METHOD(void, lock, (), (override));
     MOCK_METHOD(void, unlock, (), (override));
     MOCK_METHOD(bool, isDoorOpened, (), (override));
 };
 
 class MockTimedDoor : public TimedDoor {
-public:
+ public:
     explicit MockTimedDoor(int timeout) : TimedDoor(timeout) {}
     MOCK_METHOD(bool, isDoorOpened, (), (override));
     MOCK_METHOD(void, throwState, (), (override));
 };
 
 class TimedDoorTest : public ::testing::Test {
-protected:
+ protected:
     void SetUp() override {
         door = new TimedDoor(1);
         adapter = new DoorTimerAdapter(*door);
@@ -173,7 +173,7 @@ TEST_F(TimedDoorTest, ThrowStateDoesntChangeDoorState) {
         adapter->Timeout();
     }
     catch (...) {
-        // Исключение ожидаемо, игнорируем его
+        
     }
 
     EXPECT_TRUE(door->isDoorOpened());
